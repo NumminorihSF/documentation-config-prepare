@@ -1,0 +1,80 @@
+#!/usr/bin/env node
+const fs = require('fs');
+
+const glob = require('glob');
+const yaml = require('yaml').default;
+
+const files = glob.sync('src/**/@(*.documentation.yml|documentation.yml)');
+
+class Feature {
+  constructor(name = '') {
+    this.name = name;
+    this.subFeatures = {};
+    this.plainFiles = [];
+  }
+
+  addFile(file) {
+    const featuresCount = file.split('/features/').length - 1;
+
+    if (featuresCount === 0) {
+      this.plainFiles.push(file);
+    } else {
+       const [featureName, ...rest] = file.split('/features/');
+       if (!this.subFeatures[featureName]) {
+         this.subFeatures[featureName] = new Feature(featureName);
+       }
+
+       this.subFeatures[featureName].addFile(rest.join('/features/'));
+    }
+  }
+
+  getPlainFiles() {
+    return this.plainFiles.sort((fileA, fileB) => fileA.localeCompare(fileB));
+  }
+
+  getSubFeatures() {
+    return Object
+      .entries(this.subFeatures)
+      .sort(([nameA], [nameB]) => {
+        return nameA.localeCompare(nameB);
+      })
+      .reduce((accum, [featureName, feature]) => {
+        accum.push(
+          ...feature.getOrderedFiles()
+            .map(
+              fileName => [featureName, fileName].filter(Boolean).join('/features/')
+            ),
+        );
+
+        return accum;
+      }, []);
+  }
+
+  getOrderedFiles() {
+    return [
+      ...this.getPlainFiles(),
+      ...this.getSubFeatures(),
+    ];
+  }
+}
+
+const rootFeature = new Feature();
+
+files.forEach(file => rootFeature.addFile(file));
+
+const orderedFiles = rootFeature.getOrderedFiles();
+
+const resultTocs = [];
+
+orderedFiles.forEach(file => {
+  console.log(`Parse: ${file}`);
+  const tocs = yaml.parse(fs.readFileSync(file, { encoding:'utf8' })).toc || [];
+
+  resultTocs.push(...tocs);
+});
+
+
+
+fs.writeFileSync('documentation.yml', yaml.stringify({toc: resultTocs}));
+
+
