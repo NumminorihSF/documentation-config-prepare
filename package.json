@@ -1,6 +1,6 @@
 {
   "name": "documentation-config-prepare",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Package to generate big config for documentation.js",
   "bin": "bin",
   "keywords": [
